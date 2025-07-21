@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: practice-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: practice-app
+  template:
+    metadata:
+      labels:
+        app: practice-app
+    spec:
+      containers:
+      - name: practice-app
+        image: 215873709989.dkr.ecr.us-east-1.amazonaws.com/default/practice:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "250m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
