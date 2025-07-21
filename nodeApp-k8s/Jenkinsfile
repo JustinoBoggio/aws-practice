@@ -3,10 +3,10 @@ pipeline {
 	tools {
 		nodejs 'NodeJS'
 	}
-	def appDir = 'nodeApp-k8s'
 	environment {
 		DOCKER_HUB_CREDENTIALS_ID = 'justino-dockerhub'
 		DOCKER_HUB_REPO = 'justinoboggio0714/node-minikube'
+		APP_DIR = 'nodeApp-k8s'
 	}
 	stages {
 		stage('Checkout Github'){
@@ -16,21 +16,21 @@ pipeline {
 		}		
 		stage('Install node dependencies'){
 			steps {
-				dir(appDir) {
+				dir(env.APP_DIR) {
 					sh 'npm install'
 				}
 			}
 		}
 		stage('Test Code'){
 			steps {
-				dir(appDir) {
+				dir(env.APP_DIR) {
 					sh 'npm test'
 				}
 			}
 		}
 		stage('Build Docker Image'){
 			steps {
-				dir(appDir) {
+				dir(env.APP_DIR) {
 					script {
 						dockerImage = docker.build("${DOCKER_HUB_REPO}:latest")
 					}
@@ -39,14 +39,14 @@ pipeline {
 		}
 		stage('Trivy Scan'){
 			steps {
-				dir(appDir) {
+				dir(env.APP_DIR) {
 					sh 'trivy --severity HIGH,CRITICAL --no-progress image --format table -o trivy-scan-report.txt ${DOCKER_HUB_REPO}:latest'
 				}
 			}
 		}
 		stage('Push Image to DockerHub'){
 			steps {
-				dir(appDir) {
+				dir(env.APP_DIR) {
 					script {
 						docker.withRegistry('https://registry.hub.docker.com', "${DOCKER_HUB_CREDENTIALS_ID}"){
 							dockerImage.push('latest')
@@ -66,7 +66,7 @@ pipeline {
 		// }
 		stage('Deploy to Kubernetes'){
 			steps {
-				dir(appDir) {
+				dir(env.APP_DIR) {
 					script {
 						kubeconfig(caCertificate: 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCakNDQWU2Z0F3SUJBZ0lCQVRBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwdGFXNXAKYTNWaVpVTkJNQjRYRFRJMU1EY3hNakU1TVRRMU5Wb1hEVE0xTURjeE1URTVNVFExTlZvd0ZURVRNQkVHQTFVRQpBeE1LYldsdWFXdDFZbVZEUVRDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTEFEClAwNlhSOWJmM2c1ZDR0Y1ZYMCs1QUFhVHdUa1RkM3RLcDZQVGhkSHBiQ2R0ZDJ4a0R0aS9CSXVjbnlMZ1BTcjcKY2JpVEVUd0hyTzJpcG8vem15b1ViSVpaNXVNQkRrWUlYaDFOYVpIR0xaU0FPRGVYWW43d1lUVmF1ZUs0ZDc5QQpLQTBHdnF2aDVHbmhZSG85VW9OWFl2MGk5NlRkK1ArVjJKVTJ6eVh4UGx2ZDdZN2FJaWRrVmxkUk1GRUQxanV1CjJLcjdkNGNtWTk2VUhaUlNsZk1DajEwVUJVWnZybHVwVXYwSm9MY3dhUzA3eHRDUHQwa0JHdktoRnNwN2NVMUQKak5DeERWQTFaTGRORHBQMi9CeFNKV244U0QrVldBRUl5aGRENjFIZURsSC8rSjlYU0tuOGVjd0lPZFFBcUpZSwpWazgzaXFzMUp6OG1VN1hzb3IwQ0F3RUFBYU5oTUY4d0RnWURWUjBQQVFIL0JBUURBZ0trTUIwR0ExVWRKUVFXCk1CUUdDQ3NHQVFVRkJ3TUNCZ2dyQmdFRkJRY0RBVEFQQmdOVkhSTUJBZjhFQlRBREFRSC9NQjBHQTFVZERnUVcKQkJTV1ZDVzRCSHpLeVdWSnZsNFZmVlE2NldHVStEQU5CZ2txaGtpRzl3MEJBUXNGQUFPQ0FRRUFKenlwdEs4bwp5K1RsU1pNQ1FaSkNKTXZPeDREYmN0T2Y0a2hVdTBMamZlM0FsdHJVNzZIRXBOelR0dTdwUFRXRUphZlpaYzRwCmtKRU43QkFZVm5NMUNkRjJYMjJLVWIveXlwZGRhWVBRZFFDK0JGczZUWXJWSmRDTURMYXJYYkNlOTZORnVsQlUKM2FyZ0w2VXVUdkRJdkdXVHhXQytTUzkwWnJvYUp3ZUY5UjdCaThoTkYyWVlSMStmSVRRcXVHL0RGRmhtQy81QwpTRjJUOXFpMmpxQUYwTWM3VXVRNDVBRDQ3L05pak1UekhLY2o5Z3V5LzF2aWUzb0VrZUZTTG92bFJqVXlnaVR3CjdjUlpFT0Zic3MwU3ZKcDRNSmZHMUNJTklXRHBMZllheDkzL3piUU5hQzgvRjQ4Yy8wQzN2N3lTTlB5U2hFOW8Kb3hjcHdCNnhmbXI3b1E9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==', credentialsId: 'kubeconfig-minikube', serverUrl: 'https://127.0.0.1:62168') {
 							sh 'kubectl apply -f deployment.yaml'
