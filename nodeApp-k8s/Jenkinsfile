@@ -3,43 +3,54 @@ pipeline {
 	tools {
 		nodejs 'NodeJS'
 	}
+	def appDir = 'nodeApp-k8s'
 	environment {
-		DOCKER_HUB_CREDENTIALS_ID = 'jen-dockerhub'
-		DOCKER_HUB_REPO = 'iquantc/iquant-app'
+		DOCKER_HUB_CREDENTIALS_ID = 'justino-dockerhub'
+		DOCKER_HUB_REPO = 'justinoboggio0714/node-minikube'
 	}
 	stages {
 		stage('Checkout Github'){
 			steps {
-				git branch: 'main', credentialsId: 'jen-doc-git', url: 'https://github.com/iQuantC/NodeApp.git'
+				git branch: 'main', credentialsId: 'git-pat', url: 'https://github.com/JustinoBoggio/aws-practice.git'
 			}
 		}		
 		stage('Install node dependencies'){
 			steps {
-				sh 'npm install'
+				dir(appDir) {
+					sh 'npm install'
+				}
 			}
 		}
 		stage('Test Code'){
 			steps {
-				sh 'npm test'
+				dir(appDir) {
+					sh 'npm test'
+				}
 			}
 		}
 		stage('Build Docker Image'){
 			steps {
-				script {
-					dockerImage = docker.build("${DOCKER_HUB_REPO}:latest")
+				dir(appDir) {
+					script {
+						dockerImage = docker.build("${DOCKER_HUB_REPO}:latest")
+					}
 				}
 			}
 		}
 		stage('Trivy Scan'){
 			steps {
-				sh 'trivy --severity HIGH,CRITICAL --no-progress image --format table -o trivy-scan-report.txt ${DOCKER_HUB_REPO}:latest'
+				dir(appDir) {
+					sh 'trivy --severity HIGH,CRITICAL --no-progress image --format table -o trivy-scan-report.txt ${DOCKER_HUB_REPO}:latest'
+				}
 			}
 		}
 		stage('Push Image to DockerHub'){
 			steps {
-				script {
-					docker.withRegistry('https://registry.hub.docker.com', "${DOCKER_HUB_CREDENTIALS_ID}"){
-						dockerImage.push('latest')
+				dir(appDir) {
+					script {
+						docker.withRegistry('https://registry.hub.docker.com', "${DOCKER_HUB_CREDENTIALS_ID}"){
+							dockerImage.push('latest')
+						}
 					}
 				}
 			}
@@ -55,9 +66,12 @@ pipeline {
 		// }
 		stage('Deploy to Kubernetes'){
 			steps {
-				script {
-					kubeconfig(caCertificate: 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCakNDQWU2Z0F3SUJBZ0lCQVRBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwdGFXNXAKYTNWaVpVTkJNQjRYRFRJME1Ea3dOekU1TXpjMU5sb1hEVE0wTURrd05qRTVNemMxTmxvd0ZURVRNQkVHQTFVRQpBeE1LYldsdWFXdDFZbVZEUVRDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTkVrCnJ1RTFqZCs0NC8rYkJPZEZpT1oyUWhzYklHSzVLVG1Talc4WEZ4V201NTQ3QXZYemNxU1dnSE5VSTllNjJ3N1UKcUxMREhXWDhPYmFuUDlKUjF4VkNNWWQ0cVBxcXRWS0kwT3h5bkdTNmRzV05La2FMVldJdVc3b0dIeXJBTnVwMAo3bEF6Q3RnWmZPU3N4cDNBL3grVGpYbWpGNlplWkdxdUoxOVJCZ1N3ZFdWc1NBQ0VHM3RZRnFKd1JEL1Z3bzV1CndyT1ZTdUs5M1ZNUDh1REhveDZ6RkZ5Yk5TdW1xSEptcWRIUUFvb0lleWJjVDNTQ1RaRkttQjJzNmV6NnZRM0IKZVhBaTQwQ3NoZjlUMzhTYlVvRXNtb0FQdktHQURyc2RDNUVpZ0JJdWNKTzBtSjZTblk3THZ2Q2hIKzhPR1orNAp3bW1XcGt6TkpnM0xkZk9RRmkwQ0F3RUFBYU5oTUY4d0RnWURWUjBQQVFIL0JBUURBZ0trTUIwR0ExVWRKUVFXCk1CUUdDQ3NHQVFVRkJ3TUNCZ2dyQmdFRkJRY0RBVEFQQmdOVkhSTUJBZjhFQlRBREFRSC9NQjBHQTFVZERnUVcKQkJRaVFkbFFIRUhtUklTZFQ2cmF4MFZ0cGpBOGJUQU5CZ2txaGtpRzl3MEJBUXNGQUFPQ0FRRUFZMjRzRXpmTQpZZHl4Szd6bjc4VklYMUFNK0xDVHQyOTFPb3Roa1loajFxYXJJMzZSMEhYVXZRa3FaYVFSUXhxQWZsMnhSaVd2CkY1VUlJbm9YcmVxTFdhNVk4emh0dFJxK05rZU9iaXV4MzhIb1FWWTl4dG5BcFh2TE9RanF4LzZhcVlzdjJpNUgKTmpJMWQxdWVWMmJGVHZWODJlRDdxNWNabXpPaFJxcWNPUVBvYkZPNW9qbXpLTVh1ajZ3VlpWNlk4cmdzTlFOeQpuZU00NEg0NmU5OW9hZTlsMlZUM3BEVE9IeUVIYmhFUXBFaHE5RXpBVUZMQUNRa01kN1VGaENacXhmOHRZRG85CndzaXFCem5lYUVUYUZtRlZFQTEwUk5uNjhtV05rT09XZEVhNmNGNVhNTUQrRjMwaGs4eXV4OVlzcG9uaHF5d0sKUHZ5T0Vocm9EVjUyd1E9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==', credentialsId: 'kubeconfig', serverUrl: 'https://192.168.49.2:8443') {
-    						sh 'kubectl apply -f deployment.yaml'
+				dir(appDir) {
+					script {
+						kubeconfig(caCertificate: 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCakNDQWU2Z0F3SUJBZ0lCQVRBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwdGFXNXAKYTNWaVpVTkJNQjRYRFRJMU1EY3hNakU1TVRRMU5Wb1hEVE0xTURjeE1URTVNVFExTlZvd0ZURVRNQkVHQTFVRQpBeE1LYldsdWFXdDFZbVZEUVRDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTEFEClAwNlhSOWJmM2c1ZDR0Y1ZYMCs1QUFhVHdUa1RkM3RLcDZQVGhkSHBiQ2R0ZDJ4a0R0aS9CSXVjbnlMZ1BTcjcKY2JpVEVUd0hyTzJpcG8vem15b1ViSVpaNXVNQkRrWUlYaDFOYVpIR0xaU0FPRGVYWW43d1lUVmF1ZUs0ZDc5QQpLQTBHdnF2aDVHbmhZSG85VW9OWFl2MGk5NlRkK1ArVjJKVTJ6eVh4UGx2ZDdZN2FJaWRrVmxkUk1GRUQxanV1CjJLcjdkNGNtWTk2VUhaUlNsZk1DajEwVUJVWnZybHVwVXYwSm9MY3dhUzA3eHRDUHQwa0JHdktoRnNwN2NVMUQKak5DeERWQTFaTGRORHBQMi9CeFNKV244U0QrVldBRUl5aGRENjFIZURsSC8rSjlYU0tuOGVjd0lPZFFBcUpZSwpWazgzaXFzMUp6OG1VN1hzb3IwQ0F3RUFBYU5oTUY4d0RnWURWUjBQQVFIL0JBUURBZ0trTUIwR0ExVWRKUVFXCk1CUUdDQ3NHQVFVRkJ3TUNCZ2dyQmdFRkJRY0RBVEFQQmdOVkhSTUJBZjhFQlRBREFRSC9NQjBHQTFVZERnUVcKQkJTV1ZDVzRCSHpLeVdWSnZsNFZmVlE2NldHVStEQU5CZ2txaGtpRzl3MEJBUXNGQUFPQ0FRRUFKenlwdEs4bwp5K1RsU1pNQ1FaSkNKTXZPeDREYmN0T2Y0a2hVdTBMamZlM0FsdHJVNzZIRXBOelR0dTdwUFRXRUphZlpaYzRwCmtKRU43QkFZVm5NMUNkRjJYMjJLVWIveXlwZGRhWVBRZFFDK0JGczZUWXJWSmRDTURMYXJYYkNlOTZORnVsQlUKM2FyZ0w2VXVUdkRJdkdXVHhXQytTUzkwWnJvYUp3ZUY5UjdCaThoTkYyWVlSMStmSVRRcXVHL0RGRmhtQy81QwpTRjJUOXFpMmpxQUYwTWM3VXVRNDVBRDQ3L05pak1UekhLY2o5Z3V5LzF2aWUzb0VrZUZTTG92bFJqVXlnaVR3CjdjUlpFT0Zic3MwU3ZKcDRNSmZHMUNJTklXRHBMZllheDkzL3piUU5hQzgvRjQ4Yy8wQzN2N3lTTlB5U2hFOW8Kb3hjcHdCNnhmbXI3b1E9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==', credentialsId: 'kubeconfig-minikube', serverUrl: 'https://127.0.0.1:62168') {
+							sh 'kubectl apply -f deployment.yaml'
+							sh 'kubectl apply -f service.yaml'
+						}
 					}
 				}
 			}
