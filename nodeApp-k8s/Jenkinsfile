@@ -68,7 +68,7 @@ pipeline {
 			steps {
 				dir(env.APP_DIR) {
 					script {
-						withCredentials([file(credentialsId: 'minikube-kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+						withCredentials([file(credentialsId: 'kubeconfig-minikube', variable: 'KUBECONFIG_FILE')]) {
 							sh "export KUBECONFIG=${KUBECONFIG_FILE}"
 							sh 'kubectl version --client'
 							sh 'kubectl apply -f deployment.yaml'
